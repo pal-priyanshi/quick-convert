@@ -34,6 +34,7 @@ class BaseDataset(Dataset):
         # pass a spkid function to avoid subclassing just to implement get_spkid logic
         get_spkid_fn: Optional[Callable[[PathLike], str]] = None,
         feature_resolvers: Optional[list[PatternSidecarFeatureResolver]] = None,
+        patterns: Optional[Iterable[str]] = None,
         exclude_patterns: Optional[Iterable[str]] = None,
     ):
         if root is None and paths is None:
@@ -51,6 +52,8 @@ class BaseDataset(Dataset):
         if get_spkid_fn is not None:
             self.get_spkid = get_spkid_fn
         self.feature_resolvers = feature_resolvers or []
+
+        self.patterns = list(patterns) if patterns is not None else None
         self.exclude_patterns = exclude_patterns or []
 
         rows: list[MetadataSample] = []
@@ -87,6 +90,8 @@ class BaseDataset(Dataset):
             for split, search_root in search_roots:
                 for p in search_root.rglob("*"):
                     if not p.is_file():
+                        continue
+                    if not self._matches_patterns(p):
                         continue
                     if self._is_excluded(p):
                         continue
@@ -137,6 +142,12 @@ class BaseDataset(Dataset):
             features.update(resolver.resolve(sample))
 
         return replace(sample, features=features)
+
+    def _matches_patterns(self, path: Path) -> bool:
+        if self.patterns is None:
+            return True
+
+        return any(path.match(pattern) for pattern in self.patterns)
 
     def _is_excluded(self, path: Path) -> bool:
         return any(fnmatch(path.name, pattern) or fnmatch(str(path), pattern) for pattern in self.exclude_patterns)
