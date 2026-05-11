@@ -37,7 +37,7 @@ name = "quick-convert"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.9,<3.12"
 
 [project.optional-dependencies]
 asv = ["speechbrain>=1.1.0", "hyperpyyaml>=1.2.3"]
