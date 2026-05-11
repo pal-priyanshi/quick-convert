@@ -22,7 +22,7 @@ conflicts = [
 ]
 
 [tool.uv.sources]
-fairseq = { git = "https://github.com/liyaodev/fairseq.git" }
+fairseq = { git = "https://github.com/facebookresearch/fairseq.git" }
 
 [project]
 dependencies = [
@@ -37,21 +37,21 @@ name = "quick-convert"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.9,<3.12"
 
 [project.optional-dependencies]
 asv = ["speechbrain>=1.1.0", "hyperpyyaml>=1.2.3"]
-nac = ["tts>=0.22.0", "transformers>=5.3.0"]
+nac = ["tts>=0.22.0", "transformers"]
 web = ["flask>=3.1.3", "pandas>=1.5.3"]
 pyannote = ["pyannote-audio>=3.4.0"]
-w2vbert = ["transformers>=5.4.0"]
+w2vbert = ["transformers"]
 espnet-wavlm-joint = [
     "espnet==202511",
     "s3prl>=0.4.18",
 ]
 emotion-compensation = [
     "fairseq==0.12.2",
-    "matplotlib>=3.10.9",
+    "matplotlib",
     "speechbrain>=1.1.0",
 ]
 
