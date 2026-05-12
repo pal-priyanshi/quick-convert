@@ -59,6 +59,7 @@ class EmotionCompensationAnonymizer(BaseAnonymizer):
                 "ecapa_fbank_model_path",
             ],
         )
+        self.sr = self.h["sampling_rate"]
 
         self.model = latentGenerator(self.h, self.device).to(self.device)
 
@@ -139,6 +140,7 @@ class EmotionCompensationAnonymizer(BaseAnonymizer):
 
         # the code expects audio to be of shape [B 1 T]
         y = self.model.gen_vpc(xv_path, audio=waveform.unsqueeze(-2), f0=f0, **batch.__dict__)
+        print(y.shape)
 
         if isinstance(y, tuple):
             y = y[0]
