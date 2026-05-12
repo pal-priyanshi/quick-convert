@@ -91,8 +91,6 @@ class BaseDataset(Dataset):
                 for p in search_root.rglob(self.pattern):
                     if not p.is_file():
                         continue
-                    if not self._matches_patterns(p, search_root):
-                        continue
                     if self._is_excluded(p):
                         continue
                     if p.suffix.lower().lstrip(".") not in file_formats:
@@ -142,14 +140,6 @@ class BaseDataset(Dataset):
             features.update(resolver.resolve(sample))
 
         return replace(sample, features=features)
-
-    # def _matches_patterns(self, path: Path, search_root: Path) -> bool:
-    #     if self.pattern is None:
-    #         return True
-
-    #     rel_path = path.relative_to(search_root)
-
-    #     return any(rel_path.match(pattern) for pattern in self.patterns)
 
     def _is_excluded(self, path: Path) -> bool:
         return any(fnmatch(path.name, pattern) or fnmatch(str(path), pattern) for pattern in self.exclude_patterns)
