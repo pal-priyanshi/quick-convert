@@ -19,4 +19,4 @@ class F0Extractor(BaseFeatureExtractor):
 
     @torch.inference_mode()
     def extract_batch(self, batch: AudioBatch) -> list[dict[str, torch.Tensor]]:
-        return self.extract_fn(batch.audio.to(self.device), **self.extract_kwargs)
+        return self.extract_fn(batch.waveforms.to(self.device), **self.extract_kwargs)

@@ -15,12 +15,14 @@ class PrecomputeFeaturesPipeline:
         dataset,
         extractor,
         out_root: str | Path,
+        skip_existing: bool = False,
         batch_size: int = 1,
         num_workers: int = 0,
     ):
         self.dataset = dataset
         self.extractor = extractor
         self.out_root = Path(out_root)
+        self.skip_existing = skip_existing
         self.batch_size = batch_size
         self.num_workers = num_workers
 
@@ -48,6 +50,8 @@ class PrecomputeFeaturesPipeline:
                     out_dir.mkdir(parents=True, exist_ok=True)
 
                     out_path = out_dir / f"{utt_id}.pt"
+                    if self.skip_existing and out_path.exists():
+                        continue
                     torch.save(output, out_path)
 
                     row = {

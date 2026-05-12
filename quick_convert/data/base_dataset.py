@@ -194,7 +194,7 @@ class BaseDataset(Dataset):
 
         padded = pad_sequence(waveforms, batch_first=True)
 
-        sample_rates = [item["sample_rate"] for item in batch]
+        sample_rates = [item.sample_rate for item in batch]
         # if len(set(sample_rates)) != 1:
         #     raise ValueError(f"Batch contains multiple sample rates: {sorted(set(sample_rates))}")
 
@@ -202,9 +202,9 @@ class BaseDataset(Dataset):
             waveforms=padded,
             lengths=lengths,
             sample_rates=sample_rates,
-            paths=[item["path"] for item in batch],
-            splits=[item["split"] for item in batch],
-            spk_ids=[item["spk_id"] for item in batch],
+            paths=[item.path for item in batch],
+            splits=[item.split for item in batch],
+            spk_ids=[item.spk_id for item in batch],
         )
 
     def make_dataloader(
