@@ -11,11 +11,11 @@ target_id: ""
 
 pipeline:
   feature_providers:
-    # - _target_: quick_convert.components.feature_providers.sidecar.PatternSidecarFeatureProvider
-    #   key: speaker_embedding
-    #   root: /cfs/home/u036742/emotion-compensation/results/IEMOCAP_dev_ohnn_pre_esd_msp_sad1
-    #   pattern: "{stem}_{step}.xvector"
-    #   step: 1
+    - _target_: quick_convert.components.feature_providers.sidecar.PatternSidecarFeatureProvider
+      key: speaker_embedding
+      root: /cfs/home/u036742/emotion-compensation/results/IEMOCAP_dev_ohnn_pre_esd_msp_sad1
+      pattern: "{stem}_{step}.xvector"
+      step: 1
     - _target_: quick_convert.components.feature_providers.online.OnlineFeatureProvider
       extractor:
         _target_: quick_convert.components.feature_extractors.f0.F0Extractor
