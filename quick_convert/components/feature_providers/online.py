@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
+import torch
+
 from quick_convert.data.types import AudioBatch, AudioSample
 
 
@@ -14,8 +16,8 @@ class OnlineFeatureProvider:
         self.extractor = extractor
         self.key = self.extractor.feature_name if key is None else key
 
-    def provide_sample(self, sample: AudioSample) -> dict[str, Any]:
+    def provide_sample(self, sample: AudioSample) -> torch.Tensor:
         return self.extractor.extract_sample(sample)
 
-    def provide_batch(self, batch: AudioBatch) -> dict[str, Any]:
+    def provide_batch(self, batch: AudioBatch) -> torch.Tensor:
         return self.extractor.extract_batch(batch)

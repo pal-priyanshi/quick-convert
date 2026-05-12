@@ -114,7 +114,7 @@ class EmotionCompensationAnonymizer(BaseAnonymizer):
         features = self.provide_features(sample)
 
         xv_path = features["speaker_embedding"]
-        f0 = features["f0"]
+        f0 = features["f0"].to(self.device)
 
         y = self.model.gen_vpc(xv_path, audio=waveform, f0=f0, **sample.__dict__)
 
