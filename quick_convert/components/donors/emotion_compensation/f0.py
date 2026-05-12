@@ -41,7 +41,7 @@ class PYAAPTF0Extractor(F0Extractor):
         pass
 
     def _get_f0(self, audio, rate=16000, interp=False):
-        return torch.FloatTensor(get_yaapt_f0(audio, rate=rate, interp=interp)).to(self.device)
+        return torch.FloatTensor(get_yaapt_f0(audio, rate=rate, interp=interp))
 
     def extract_sample(self, sample: AudioSample, rate=16000, interp=False):
 

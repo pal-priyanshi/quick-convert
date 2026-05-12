@@ -1,10 +1,5 @@
 from __future__ import annotations
-from typing import Union
-
-import torch
-
 from .base import BaseFeatureExtractor
-from ...data.types import AudioBatch, AudioSample
 
 
 class F0Extractor(BaseFeatureExtractor):
