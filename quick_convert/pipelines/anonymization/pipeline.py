@@ -67,4 +67,5 @@ class AnonymizationPipeline(Generic[T_Target]):
                 continue
 
             wav_conv = anonymize_fn(sample)
-            torchaudio.save(str(out_path), wav_conv, self.anonymizer.sr)
+            if wav_conv:
+                torchaudio.save(str(out_path), wav_conv, self.anonymizer.sr)

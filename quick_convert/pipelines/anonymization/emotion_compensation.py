@@ -115,9 +115,13 @@ class EmotionCompensationAnonymizer(BaseAnonymizer):
         features = self.provide_features(sample)
 
         xv_path = features["speaker_embedding"]
+        if not xv_path.exists():
+            return
+
         f0 = features["f0"].to(self.device)
 
         y = self.model.gen_vpc(xv_path, audio=waveform, f0=f0, **sample.__dict__)
+        print(y.shape)
 
         if isinstance(y, tuple):
             y = y[0]
@@ -140,7 +144,6 @@ class EmotionCompensationAnonymizer(BaseAnonymizer):
 
         # the code expects audio to be of shape [B 1 T]
         y = self.model.gen_vpc(xv_path, audio=waveform.unsqueeze(-2), f0=f0, **batch.__dict__)
-        print(y.shape)
 
         if isinstance(y, tuple):
             y = y[0]
