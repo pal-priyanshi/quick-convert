@@ -29,7 +29,7 @@ class PatternSidecarFeatureProvider:
         return self.loader(path) if self.load else path
 
     def provide_sample(self, sample: AudioSample) -> dict[str, Any]:
-        return {self.key: self.provide_value(sample)}
+        return self.provide_value(sample)
 
-    def provide_batch(self, batch: AudioBatch) -> dict[str, list[Any]]:
-        return {self.key: [self.provide_value(sample) for sample in batch]}
+    def provide_batch(self, batch: AudioBatch) -> list[Any]:
+        return [self.provide_value(sample) for sample in batch]
