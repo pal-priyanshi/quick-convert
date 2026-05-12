@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import json
 from pathlib import Path
-from typing import Optional
+from typing import Any, List, Optional
+
+from quick_convert.data.types import AudioBatch
 
 from ...utils.donor_utils import resolve_donor_paths
 import torch
@@ -30,8 +32,9 @@ class EmotionCompensationAnonymizer(BaseAnonymizer):
         # f0_provider: Optional[str | Path] = None,
         remove_weight_norm: bool = True,
         donor_root: Optional[Path] = Path(__file__).parents[2] / "components" / "donors" / "emotion_compensation",
+        feature_providers: Optional[List[Any]] = None,
     ) -> None:
-        super().__init__()
+        super().__init__(feature_providers=feature_providers)
         self.checkpoint_file = Path(checkpoint_file)
 
         config_path = (
@@ -56,6 +59,7 @@ class EmotionCompensationAnonymizer(BaseAnonymizer):
                 "ecapa_fbank_model_path",
             ],
         )
+        self.sr = self.h["sampling_rate"]
 
         self.model = latentGenerator(self.h, self.device).to(self.device)
 
@@ -100,12 +104,45 @@ class EmotionCompensationAnonymizer(BaseAnonymizer):
         waveform = torch.atleast_2d(sample.waveform)
         waveform = waveform.to(self.device)
 
-        # xv_path = sample.features.pop("xvector_path")
+        # Match original latentDataset full-utterance inference behavior
+        ssl_hop_size = 320
 
-        xv_path = sample.features["speaker_embedding"]
-        f0 = sample.features["f0"]
+        num_samples = waveform.shape[-1]
+        trimmed_num_samples = (num_samples // ssl_hop_size) * ssl_hop_size
+        waveform = waveform[..., :trimmed_num_samples]
+
+        sample = replace(sample, waveform=waveform)
+        features = self.provide_features(sample)
+
+        xv_path = features["speaker_embedding"]
+        if not xv_path.exists():
+            return
+
+        f0 = features["f0"].to(self.device)
 
         y = self.model.gen_vpc(xv_path, audio=waveform, f0=f0, **sample.__dict__)
+
+        if isinstance(y, tuple):
+            y = y[0]
+
+        return y.squeeze(0).detach().cpu()
+
+    @torch.inference_mode()
+    def anonymize_batch(
+        self,
+        batch: AudioBatch,
+    ) -> torch.Tensor:
+
+        waveform = torch.atleast_2d(batch.waveform)
+        waveform = waveform.to(self.device)
+
+        # xv_path = sample.features.pop("xvector_path")
+
+        xv_path = batch.features["speaker_embedding"]
+        f0 = batch.features["f0"]
+
+        # the code expects audio to be of shape [B 1 T]
+        y = self.model.gen_vpc(xv_path, audio=waveform.unsqueeze(-2), f0=f0, **batch.__dict__)
 
         if isinstance(y, tuple):
             y = y[0]

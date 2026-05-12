@@ -10,19 +10,22 @@ import torch
 
 class BaseFeatureExtractor(ABC):
     @property
-    @abstractmethod
+    def key(self) -> str:
+        return self.feature_name
+
+    @property
     def feature_name(self) -> str:
         """Name used for saving and directory structure."""
-        ...
+        raise NotImplementedError
 
-    @abstractmethod
-    def extract_batch(self, batch: dict[str, Any]) -> dict[str, torch.Tensor]:
-        """
-        Args:
-            batch: output of DataLoader collate_fn
+    def extract_sample(self, sample):
+        raise NotImplementedError
 
-        Returns:
-            dict of batched features, e.g.:
-                {"embedding": Tensor[B, D]}
-        """
-        ...
+    def extract_batch(self, batch):
+        raise NotImplementedError
+
+    def provide_sample(self, sample):
+        return self.extract_sample(sample)
+
+    def provide_batch(self, batch):
+        return self.extract_batch(batch)
