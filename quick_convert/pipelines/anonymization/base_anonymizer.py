@@ -47,7 +47,7 @@ class BaseAnonymizer(nn.Module, ABC, Generic[T_Target]):
             # this shouldn't happen because feature extraction shouldn't exist at any other point in the pipeline
             if provider.key in features:
                 continue
-            features.update({provider.key: getattr(provider, provider_fn)(sample_or_batch)})
+            features.update({provider.key: getattr(provider, provider_fn)(sample_or_batch).to(self.device)})
 
         return features
 
