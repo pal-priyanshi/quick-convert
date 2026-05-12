@@ -2,9 +2,9 @@
 import numpy as np
 import amfm_decompy.basic_tools as basic
 import amfm_decompy.pYAAPT as pYAAPT
-from sympy import Union
 import torch
 
+from quick_convert.components.feature_extractors.f0 import F0Extractor
 from quick_convert.data.types import AudioBatch, AudioSample
 
 
@@ -32,7 +32,7 @@ def get_yaapt_f0(audio, rate=16000, interp=False):
     return f0
 
 
-class PYAAPTF0Extractor:
+class PYAAPTF0Extractor(F0Extractor):
     """
     A wrapper I had to build to convert the tensor to numpy and possibly resolve the shape
     """
@@ -40,9 +40,17 @@ class PYAAPTF0Extractor:
     def __init__(self):
         pass
 
-    def __call__(self, x: torch.tensor, rate=16000, interp=False):
+    def _get_f0(self, audio, rate=16000, interp=False):
+        return torch.FloatTensor(get_yaapt_f0(audio, rate=rate, interp=interp))
 
-        x = x.cpu().numpy()
+    def extract_sample(self, sample: AudioSample, rate=16000, interp=False):
+
+        x = sample.waveform.cpu().numpy()
         # input_shape = x.shape
-        f0 = get_yaapt_f0(x, rate=rate, interp=interp)
-        return torch.FloatTensor(f0)
+        return self._get_f0(x, rate=rate, interp=interp)
+
+    def extract_batch(self, batch: AudioBatch, rate=16000, interp=False):
+
+        x = batch.waveforms.cpu().numpy()
+        # input_shape = x.shape
+        return self._get_f0(x, rate=rate, interp=interp)

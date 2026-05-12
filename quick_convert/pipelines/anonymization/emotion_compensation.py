@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import json
 from pathlib import Path
-from typing import Optional
+from typing import Any, List, Optional
 
 from quick_convert.data.types import AudioBatch
 
@@ -32,8 +32,9 @@ class EmotionCompensationAnonymizer(BaseAnonymizer):
         # f0_provider: Optional[str | Path] = None,
         remove_weight_norm: bool = True,
         donor_root: Optional[Path] = Path(__file__).parents[2] / "components" / "donors" / "emotion_compensation",
+        feature_providers: Optional[List[Any]] = None,
     ) -> None:
-        super().__init__()
+        super().__init__(feature_providers=feature_providers)
         self.checkpoint_file = Path(checkpoint_file)
 
         config_path = (
@@ -102,8 +103,18 @@ class EmotionCompensationAnonymizer(BaseAnonymizer):
         waveform = torch.atleast_2d(sample.waveform)
         waveform = waveform.to(self.device)
 
-        xv_path = sample.features["speaker_embedding"]
-        f0 = sample.features["f0"]
+        # Match original latentDataset full-utterance inference behavior
+        ssl_hop_size = 320
+
+        num_samples = waveform.shape[-1]
+        trimmed_num_samples = (num_samples // ssl_hop_size) * ssl_hop_size
+        waveform = waveform[..., :trimmed_num_samples]
+
+        sample = replace(sample, waveform=waveform)
+        features = self.provide_features(sample)
+
+        xv_path = features["speaker_embedding"]
+        f0 = features["f0"]
 
         y = self.model.gen_vpc(xv_path, audio=waveform, f0=f0, **sample.__dict__)
 
