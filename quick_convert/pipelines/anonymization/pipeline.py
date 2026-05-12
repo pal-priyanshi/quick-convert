@@ -67,5 +67,9 @@ class AnonymizationPipeline(Generic[T_Target]):
                 continue
 
             wav_conv = anonymize_fn(sample)
-            if wav_conv:
+            
+            # i made the anonymize function return none of there's a problem
+            # so that it can skip faulty samples without killing the loop. Definitely
+            # not a permanent solution.
+            if wav_conv is not None:
                 torchaudio.save(str(out_path), wav_conv, self.anonymizer.sr)
