@@ -12,8 +12,7 @@ target_id: ""
 dataset:
   load: true
   # limit to sentences, because original emotion-compensation does that
-  patterns:
-    - sentences/**/*.wav
+  pattern: sentences/**/*.wav
   feature_resolvers:
     - _target_: quick_convert.data.features.PatternSidecarFeatureResolver
       key: xvector_path

@@ -34,7 +34,7 @@ class BaseDataset(Dataset):
         # pass a spkid function to avoid subclassing just to implement get_spkid logic
         get_spkid_fn: Optional[Callable[[PathLike], str]] = None,
         feature_resolvers: Optional[list[PatternSidecarFeatureResolver]] = None,
-        patterns: Optional[Iterable[str]] = None,
+        pattern: Optional[str] = None,
         exclude_patterns: Optional[Iterable[str]] = None,
     ):
         if root is None and paths is None:
@@ -53,7 +53,7 @@ class BaseDataset(Dataset):
             self.get_spkid = get_spkid_fn
         self.feature_resolvers = feature_resolvers or []
 
-        self.patterns = list(patterns) if patterns is not None else None
+        self.pattern = pattern or "*"
         self.exclude_patterns = exclude_patterns or []
 
         rows: list[MetadataSample] = []
@@ -88,7 +88,7 @@ class BaseDataset(Dataset):
             file_formats = self.file_formats if self.file_formats is not None else self.VALID_FORMATS
 
             for split, search_root in search_roots:
-                for p in search_root.rglob("*"):
+                for p in search_root.rglob(self.pattern):
                     if not p.is_file():
                         continue
                     if not self._matches_patterns(p, search_root):
@@ -143,13 +143,13 @@ class BaseDataset(Dataset):
 
         return replace(sample, features=features)
 
-    def _matches_patterns(self, path: Path, search_root: Path) -> bool:
-        if self.patterns is None:
-            return True
+    # def _matches_patterns(self, path: Path, search_root: Path) -> bool:
+    #     if self.pattern is None:
+    #         return True
 
-        rel_path = path.relative_to(search_root)
+    #     rel_path = path.relative_to(search_root)
 
-        return any(rel_path.match(pattern) for pattern in self.patterns)
+    #     return any(rel_path.match(pattern) for pattern in self.patterns)
 
     def _is_excluded(self, path: Path) -> bool:
         return any(fnmatch(path.name, pattern) or fnmatch(str(path), pattern) for pattern in self.exclude_patterns)
