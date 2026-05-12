@@ -34,6 +34,7 @@ class BaseDataset(Dataset):
         # pass a spkid function to avoid subclassing just to implement get_spkid logic
         get_spkid_fn: Optional[Callable[[PathLike], str]] = None,
         feature_resolvers: Optional[list[PatternSidecarFeatureResolver]] = None,
+        pattern: Optional[str] = None,
         exclude_patterns: Optional[Iterable[str]] = None,
     ):
         if root is None and paths is None:
@@ -51,6 +52,8 @@ class BaseDataset(Dataset):
         if get_spkid_fn is not None:
             self.get_spkid = get_spkid_fn
         self.feature_resolvers = feature_resolvers or []
+
+        self.pattern = pattern or "*"
         self.exclude_patterns = exclude_patterns or []
 
         rows: list[MetadataSample] = []
@@ -85,7 +88,7 @@ class BaseDataset(Dataset):
             file_formats = self.file_formats if self.file_formats is not None else self.VALID_FORMATS
 
             for split, search_root in search_roots:
-                for p in search_root.rglob("*"):
+                for p in search_root.rglob(self.pattern):
                     if not p.is_file():
                         continue
                     if self._is_excluded(p):
@@ -191,7 +194,7 @@ class BaseDataset(Dataset):
 
         padded = pad_sequence(waveforms, batch_first=True)
 
-        sample_rates = [item["sample_rate"] for item in batch]
+        sample_rates = [item.sample_rate for item in batch]
         # if len(set(sample_rates)) != 1:
         #     raise ValueError(f"Batch contains multiple sample rates: {sorted(set(sample_rates))}")
 
@@ -199,9 +202,9 @@ class BaseDataset(Dataset):
             waveforms=padded,
             lengths=lengths,
             sample_rates=sample_rates,
-            paths=[item["path"] for item in batch],
-            splits=[item["split"] for item in batch],
-            spk_ids=[item["spk_id"] for item in batch],
+            paths=[item.path for item in batch],
+            splits=[item.split for item in batch],
+            spk_ids=[item.spk_id for item in batch],
         )
 
     def make_dataloader(

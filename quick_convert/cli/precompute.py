@@ -6,11 +6,14 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 
 
-@hydra.main(version_base=None, config_path="../../configs", config_name="run/precompute_speaker_embedding_espnet_wavlm_joint")
+@hydra.main(
+    version_base=None,
+    config_path="../../configs",
+    config_name="run/precompute_speaker_embedding_espnet_wavlm_joint",
+)
 def main(cfg: DictConfig) -> None:
     # Helpful for debugging composed config at runtime.
     print(OmegaConf.to_yaml(cfg, resolve=True))
-
 
     pipeline = hydra.utils.instantiate(cfg.pipeline)
     pipeline.run()

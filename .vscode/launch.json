@@ -50,6 +50,23 @@
             "env": {
                 "CUDA_VISIBLE_DEVICES": "0"
             }
+        },
+        {
+            "name": "precompute f0",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "quick_convert.cli.precompute",
+            "args": [
+                "--config-name",
+                "run/precompute_f0_stutter",
+            ],
+            "console": "integratedTerminal",
+            "python": ".venv/bin/python",
+            "justMyCode": false,
+            "env": {
+                "CUDA_VISIBLE_DEVICES": "0",
+                "HYDRA_FULL_ERROR": "1"
+            }
         }
     ]
 }
