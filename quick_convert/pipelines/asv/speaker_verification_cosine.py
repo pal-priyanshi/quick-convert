@@ -5,8 +5,11 @@ import os
 import speechbrain as sb
 import torch
 import torchaudio
-from speechbrain.dataio import audio_io
 from tqdm import tqdm
+# Removed the audio_io and replacing with loader created in audio_loading.py - 
+# This wraps SpeechBrain's regular audio loader and also understands Emilia
+# tar-shard manifest paths such as tar://shard.tar::audio.mp3.
+from quick_convert.pipelines.asv.audio_loading import load_audio_from_manifest
 
 
 def compute_embedding(wavs, wav_lens, params):
@@ -143,8 +146,7 @@ def dataio_prep(params):
     def audio_pipeline(wav, start, stop):
         start = int(start)
         stop = int(stop)
-        num_frames = stop - start
-        sig, fs = audio_io.load(wav, num_frames=num_frames, frame_offset=start)
+        sig, fs = load_audio_from_manifest(wav, start=start, stop=stop)
 
         sig = torchaudio.functional.resample(sig, fs, params["sample_rate"])
         # trim it because samples longer than this can crash the process

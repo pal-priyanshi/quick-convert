@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import csv
+import hashlib
+import json
 import random
+import tarfile
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -11,6 +14,9 @@ import torchaudio
 from tqdm import tqdm
 
 from quick_convert.data.base_dataset import AudioSample, BaseDataset
+
+
+EMILIA_AUDIO_EXTENSIONS = (".mp3", ".wav", ".flac", ".ogg", ".m4a") #mostly has .mp3 but keeping others to make it work in case
 
 
 def _get_audio_info(row: AudioSample) -> dict:
@@ -99,6 +105,218 @@ def _write_audio_sample_csv(
                 ]
             )
             out_idx += 1
+
+
+def _stable_fraction(value: str, *, seed: int) -> float:
+    """Map a string to a deterministic number in [0, 1).
+
+    We use this to assign each speaker to train or dev without collecting every
+    speaker first. The seed lets us change the split while keeping it stable
+    across repeated runs.
+    """
+    digest = hashlib.sha1(f"{seed}:{value}".encode("utf-8")).hexdigest()
+    return int(digest, 16) / float(1 << 160)
+
+
+def _find_emilia_shards(emilia_en_dir: str | Path, pattern: str = "*.tar*") -> list[Path]:
+    """Find complete Emilia tar shards in the EN subset directory."""
+    emilia_en_dir = Path(emilia_en_dir).expanduser()
+    if not emilia_en_dir.is_dir():
+        raise NotADirectoryError(f"Expected Emilia EN shard directory: {emilia_en_dir}")
+
+    shards = sorted(
+        p
+        for p in emilia_en_dir.glob(pattern)
+        # Some downloads may leave split fragments such as .tar.gz.0. Those are
+        # not complete tar archives, so skip them until they are combined.
+        if p.is_file() and not p.suffix.lstrip(".").isdigit()
+    )
+    if not shards:
+        raise FileNotFoundError(
+            f"No Emilia shards matching {pattern!r} found in {emilia_en_dir}"
+        )
+    return shards
+
+
+def _resolve_emilia_audio_member(
+    *,
+    json_member_name: str,
+    metadata: dict,
+    members: set[str],
+) -> str | None:
+    """Match an Emilia JSON metadata file to its audio file inside the same tar."""
+    # Best case: the metadata already names the exact audio member.
+    wav = metadata.get("wav")
+    if isinstance(wav, str) and wav in members:
+        return wav
+
+    # Common case: JSON and audio share the same path stem, only the extension
+    # differs, e.g. sample.json -> sample.mp3.
+    json_path = Path(json_member_name)
+    for ext in EMILIA_AUDIO_EXTENSIONS:
+        candidate = str(json_path.with_suffix(ext))
+        if candidate in members:
+            return candidate
+
+    # Fallback: use the Emilia item id and search for one matching audio member.
+    item_id = metadata.get("id") or json_path.stem
+    if isinstance(item_id, str):
+        for ext in EMILIA_AUDIO_EXTENSIONS:
+            suffix = f"{item_id}{ext}"
+            matches = [member for member in members if member.endswith(suffix)]
+            if len(matches) == 1:
+                return matches[0]
+
+    return None
+
+
+def _iter_emilia_shard_rows(
+    shard: Path,
+    *,
+    sample_rate: int,
+    min_duration: float | None,
+    max_duration: float | None,
+    min_dnsmos: float | None,
+) -> Iterable[dict[str, str | int | float]]:
+    """Yield ASV CSV rows from one Emilia shard.
+
+    This reads only the JSON metadata plus the tar member names. It does not
+    decode the audio during CSV preparation, which keeps preparation fast and
+    avoids extracting the dataset.
+    """
+    with tarfile.open(shard, "r:*") as tar:
+        # Build a set of all file names in the shard so JSON -> audio matching is
+        # cheap and does not require repeated tar scans.
+        members = {member.name for member in tar.getmembers() if member.isfile()}
+        json_members = sorted(name for name in members if name.endswith(".json"))
+
+        for json_name in json_members:
+            extracted = tar.extractfile(json_name)
+            if extracted is None:
+                continue
+
+            metadata = json.loads(extracted.read().decode("utf-8"))
+            duration = float(metadata.get("duration", 0.0))
+            # Keep training examples within a practical duration range.
+            if min_duration is not None and duration < min_duration:
+                continue
+            if max_duration is not None and duration > max_duration:
+                continue
+            # Optional quality filter when Emilia's DNSMOS score is available.
+            if min_dnsmos is not None:
+                dnsmos = metadata.get("dnsmos")
+                if dnsmos is None or float(dnsmos) < min_dnsmos:
+                    continue
+
+            # ASV training needs a speaker label for every sample.
+            speaker = metadata.get("speaker")
+            if not speaker:
+                continue
+
+            # Find the actual audio file paired with this JSON metadata file.
+            inner_path = _resolve_emilia_audio_member(
+                json_member_name=json_name,
+                metadata=metadata,
+                members=members,
+            )
+            if not inner_path:
+                continue
+
+            item_id = metadata.get("id") or Path(inner_path).stem
+            num_frames = max(1, int(round(duration * sample_rate)))
+
+            # The wav column keeps the existing ASV CSV contract, but points to
+            # an audio member inside a tar shard instead of an extracted file.
+            yield {
+                "source_id": str(item_id),
+                "duration": duration,
+                "sample_rate": sample_rate,
+                "wav": f"tar://{Path(shard).resolve()}::{inner_path}",
+                "start": 0,
+                "stop": num_frames,
+                "spk_id": str(speaker),
+                "shard": str(Path(shard).resolve()),
+                "inner_path": inner_path,
+            }
+
+
+def prepare_asv_csvs_from_emilia(
+    emilia_en_dir: str | Path,
+    save_folder: str | Path,
+    train_fraction: float = 0.9,
+    seed: int = 1337,
+    shard_pattern: str = "*.tar*",
+    sample_rate: int = 24000,
+    min_duration: float | None = 3.0,
+    max_duration: float | None = 30.0,
+    min_dnsmos: float | None = None,
+) -> tuple[str, str, int]:
+    """Prepare ASV train/dev CSVs directly from Emilia EN tar shards.
+
+    The split is speaker-stable and streaming-friendly: each speaker is assigned
+    by a hash, so we never need to hold the full Emilia subset in memory.
+    """
+    save_folder = Path(save_folder)
+    save_folder.mkdir(parents=True, exist_ok=True)
+
+    train_csv = save_folder / "train.csv"
+    dev_csv = save_folder / "dev.csv"
+    shards = _find_emilia_shards(emilia_en_dir, pattern=shard_pattern)
+
+    fieldnames = [
+        "ID",
+        "duration",
+        "sample_rate",
+        "wav",
+        "start",
+        "stop",
+        "spk_id",
+        "shard",
+        "inner_path",
+        "source_id",
+    ]
+
+    train_speakers: set[str] = set()
+    train_idx = 0
+    dev_idx = 0
+
+    with train_csv.open("w", newline="", encoding="utf-8") as train_f, dev_csv.open(
+        "w", newline="", encoding="utf-8"
+    ) as dev_f:
+        train_writer = csv.DictWriter(train_f, fieldnames=fieldnames)
+        dev_writer = csv.DictWriter(dev_f, fieldnames=fieldnames)
+        train_writer.writeheader()
+        dev_writer.writeheader()
+
+        for shard in tqdm(shards, desc="Reading Emilia shards"):
+            # Process one shard at a time so memory use stays bounded even for
+            # the full Emilia EN subset.
+            for row in _iter_emilia_shard_rows(
+                shard,
+                sample_rate=sample_rate,
+                min_duration=min_duration,
+                max_duration=max_duration,
+                min_dnsmos=min_dnsmos,
+            ):
+                spk_id = str(row["spk_id"])
+                # Assign by speaker, not by utterance, to prevent speaker
+                # overlap between train and dev.
+                if _stable_fraction(spk_id, seed=seed) < train_fraction:
+                    row["ID"] = str(train_idx)
+                    train_writer.writerow(row)
+                    train_speakers.add(spk_id)
+                    train_idx += 1
+                else:
+                    row["ID"] = str(dev_idx)
+                    dev_writer.writerow(row)
+                    dev_idx += 1
+
+    if train_idx == 0:
+        raise ValueError("No Emilia rows were written to train.csv")
+    if dev_idx == 0:
+        raise ValueError("No Emilia rows were written to dev.csv")
+
+    return str(train_csv), str(dev_csv), len(train_speakers)
 
 
 def _resolve_eval_paths(output_dir: str | Path) -> tuple[Path, Path, Path]:

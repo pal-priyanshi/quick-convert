@@ -6,7 +6,10 @@ import hydra
 from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
 
-from ..pipelines.asv.prepare_dataset import prepare_asv_csvs_from_dataset
+from ..pipelines.asv.prepare_dataset import (
+    prepare_asv_csvs_from_dataset,
+    prepare_asv_csvs_from_emilia,
+)
 from ..pipelines.asv.train import train_asv
 
 
@@ -27,7 +30,7 @@ def resolve_prepared_data_path(
 
     prepared_data_path = Path(prepared_data_path)
     if not prepared_data_path.is_dir():
-        return None
+        return None, None
 
     train_csv = prepared_data_path / "train.csv"
     dev_csv = prepared_data_path / "dev.csv"
@@ -52,11 +55,18 @@ def main(cfg: DictConfig) -> None:
     if train_csv and dev_csv and not cfg.asv.overwrite_csv:
         n_speakers = count_unique_speakers(train_csv)
     else:
-        dataset = instantiate(cfg.dataset)
-
-        train_csv, dev_csv, n_speakers = prepare_asv_csvs_from_dataset(
-            dataset=dataset, **cfg.asv.prep
-        )
+        prep_source = cfg.asv.get("prep_source", "dataset")
+        if prep_source == "emilia":
+            train_csv, dev_csv, n_speakers = prepare_asv_csvs_from_emilia(
+                **cfg.asv.prep
+            )
+        elif prep_source == "dataset":
+            dataset = instantiate(cfg.dataset)
+            train_csv, dev_csv, n_speakers = prepare_asv_csvs_from_dataset(
+                dataset=dataset, **cfg.asv.prep
+            )
+        else:
+            raise ValueError(f"Unsupported ASV prep_source: {prep_source}")
 
     if not cfg.asv.validate:
         dev_csv = None

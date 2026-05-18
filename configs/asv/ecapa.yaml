@@ -8,7 +8,7 @@ prepared_data_path: ${asv.exp_folder}/data
 overwrite_csv: false
 
 prep:
-    save_folder: ${asv.exp_folder}/model
+    save_folder: ${asv.exp_folder}/data # cross check if it should match with prepared_data_path; this is where train/dev CSVs are written
     train_fraction: 0.9
     # train_splits: ${dataset.splits}
     # dev_splits: []
@@ -20,3 +20,4 @@ overrides:
     save_folder: ${asv.exp_folder}
     data_folder: /unused/by_custom_prep
     skip_prep: true
+    

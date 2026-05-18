@@ -23,10 +23,14 @@ import torch
 from hyperpyyaml import load_hyperpyyaml
 
 import speechbrain as sb
-from speechbrain.dataio import audio_io
 from speechbrain.utils.data_utils import download_file
 from speechbrain.utils.distributed import run_on_main
 import torchaudio
+
+# Removed the audio_io and replacing with loader created in audio_loading.py - 
+# This wraps SpeechBrain's regular audio loader and also understands Emilia
+# tar-shard manifest paths such as tar://shard.tar::audio.mp3.
+from quick_convert.pipelines.asv.audio_loading import load_audio_from_manifest
 
 ASV_SR = 16000
 
@@ -150,8 +154,9 @@ def dataio_prep(hparams):
         else:
             start = int(start)
             stop = int(stop)
-        num_frames = stop - start
-        sig, fs = audio_io.load(wav, num_frames=num_frames, frame_offset=start)
+        # Use the manifest-aware loader instead of audio_io.load directly so
+        # both normal file paths and Emilia tar-shard paths work here.
+        sig, fs = load_audio_from_manifest(wav, start=start, stop=stop)
         sig = torchaudio.functional.resample(sig, fs, hparams["sample_rate"])
         sig = sig.transpose(0, 1).squeeze(1)
         return sig

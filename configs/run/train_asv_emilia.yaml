@@ -1,0 +1,29 @@
+# @package _global_
+
+# this config selects the Emilia-specific ASV prep path, compatible with shards.
+
+defaults:
+  - /asv: ecapa
+  - _self_
+
+output_base_folder: results/asv
+asv_name: ${hydra:runtime.choices.asv}
+dataset_name: emilia_en
+suffix: ""
+
+asv:
+  prep_source: emilia
+  validate: false
+  prep:
+    emilia_en_dir: /path/to/Emilia/EN
+    save_folder: ${asv.exp_folder}/data
+    train_fraction: 0.9
+    seed: 1337
+    shard_pattern: "*.tar*"
+    sample_rate: 24000
+    min_duration: 3.0
+    max_duration: 30.0
+    min_dnsmos: null
+  overrides:
+    dataloader_options:
+      drop_last: true
